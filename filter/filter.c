@@ -9,40 +9,7 @@
 #define QUEUE_NUM 2 
 int fd_w;
 char port_num[48];
-
-int pipeopen(int *fd_w,char *port_num){
-	int pipefd[2];
-	pid_t pid;
-	char port[8]="22";
-	if(pipe(pipefd) < 0){
-		fprintf(stderr,"%s","fail to create pipe:pipe()\n");
-		return 1;
-	}
-
-	if((pid = fork()) < 0){
-		fprintf(stderr,"%s","fail to creat process:fork()\n");
-		close(pipefd[0]);
-		close(pipefd[1]);
-		return 1;
-	}
-	
-	if(pid == 0){
-		close(pipefd[1]);
-		dup2(pipefd[0],0);
-		//if(execl("/opt/filter/cfilter/specify_file.sh","/opt/filter/cfilter/specify_file.sh",port,NULL) < 0){
-		//if(execl("/opt/filter/cfilter/lsof.sh","/opt/filter/cfilter/lsof.sh","22",NULL) < 0){
-		if(execl("/opt/filter/cfilter/echo.sh","/opt/filter/cfilter/echo.sh",NULL) < 0){
-			fprintf(stderr,"%s","fail to execl()\n");
-			close(pipefd[0]);
-			return 1;
-		}
-	}
-
-	close(pipefd[0]);
-	*fd_w = pipefd[1];
-	return 0;
-}	
-
+char all_log[248];
 
 int check_ip(const char *buf,int len){
 	char dist_ip[40];
@@ -81,31 +48,43 @@ int check_ip(const char *buf,int len){
 }
 
 
-static void print_payload(const char *buf,int len){
-	int i;
-	char port[8];	
+/*
+int get_pid(){
+	char pid[64];
 	FILE * file;
+	file=fopen("/opt/filter/pid.txt");
+	if(file==NULL){
+		fprintf(stderr,"can not open pid.txt\n");
+		exit(1);
+	}
 	
+	fgets(pid,64,file);
+	sprintf(all_log,"%s",pid);
+
+}
+*/
+
+
+static void print_payload(const char *buf,int len){
+	FILE * file;
 	port_num[0]='\0';
-	port[0]='\0';
+	char cmd[128];
 
-	file=fopen("/opt/filter/cfilter/log.txt","w");
-		fprintf(file,"%d",(unsigned char)buf[20]);
-		fprintf(file,"%d",(unsigned char)buf[21]);
-		fprintf(file,"\n");
-	fclose(file);	
+	sprintf(port_num,"%02x%02x",(unsigned char)buf[20],(unsigned char)buf[21]);
 	
-	file=fopen("/opt/filter/cfilter/log.txt","r");
-		fgets(port,8,file);
-	fclose(file);
+	sprintf(cmd,"/opt/filter/port_conversion.sh %s",port_num);	
 	
-	strcpy(port_num,port);	
-
-	//meke process & shell start	
-	fd_w = fileno(stdout);
-	if(pipeopen(&fd_w,port_num) == 1){
-		exit(1);	
-	}	
+	//start shell
+	printf("cmd is %s\n",cmd);
+	if (system(cmd)==0){
+		//get_pid();
+		printf("start copy\n");
+	}else{
+		printf("no\n");
+		fprintf(stderr,"shell error\n");
+		exit(1);
+	}
+		
 }
 
 
@@ -116,10 +95,11 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	u_char *payload;
 
 	len = nfq_get_payload(nfdata,(u_char **)&payload);
-	
-	if (check_ip(payload,len)==0){
+
+	//排除対象のIPかどうかを確認し，その後の処理をするかどうか判断	
+	//if (check_ip(payload,len)==0){
 		print_payload(payload,len);
-	}
+	//}
 	
 	nfq_set_verdict(q_handle,id,NF_ACCEPT,0,NULL);
 }
