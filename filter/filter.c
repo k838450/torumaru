@@ -47,38 +47,67 @@ int check_ip(const char *buf,int len){
 
 }
 
-
-/*
+/*使わないかも
 int get_pid(){
 	char pid[64];
-	FILE * file;
-	file=fopen("/opt/filter/pid.txt");
-	if(file==NULL){
+	FILE * fp;
+
+	fp=fopen("/opt/filter/pid.txt","r");
+	if(fp==NULL){
 		fprintf(stderr,"can not open pid.txt\n");
 		exit(1);
 	}
 	
-	fgets(pid,64,file);
-	sprintf(all_log,"%s",pid);
-
+	fgets(pid,64,fp);
+	sprintf(all_log,",pid=%s",pid);
+	sprintf(all_log,"testtesttes");
+	
+	printf("full_all_log is:%s\n",all_log);
 }
 */
 
-
-static void print_payload(const char *buf,int len){
+int print_file(){
 	FILE * file;
+
+	file=fopen("/opt/filter/net_filter_log.csv","a");
+	if(file==NULL){
+		fprintf(stderr,"can not open net_filter_log.csv");
+	}	
+
+	fprintf(file,"%s\n",all_log);
+	fclose(file);
+	
+}
+ 
+
+//ペイロードからport番号を取り出してshellを起動
+static void print_payload(const char *buf,int len){
 	port_num[0]='\0';
 	char cmd[128];
+	
+	char pid[64];
+	FILE * fp;
 
 	sprintf(port_num,"%02x%02x",(unsigned char)buf[20],(unsigned char)buf[21]);
 	
 	sprintf(cmd,"/opt/filter/port_conversion.sh %s",port_num);	
 	
 	//start shell
-	printf("cmd is %s\n",cmd);
+	//printf("cmd is %s\n",cmd);
 	if (system(cmd)==0){
 		//get_pid();
-		printf("start copy\n");
+		fp=fopen("/opt/filter/pid.txt","r");
+		if(fp==NULL){
+			fprintf(stderr,"can not open pid.txt\n");
+			exit(1);
+		}	
+			
+		fgets(pid,64,fp);
+		pid[strlen(pid)-1]='\0';
+		fclose(fp);
+
+		sprintf(all_log,"pid=%sprotcol_num=%02x,dist_ip=%d.%d.%d.%d,dist_port=%d%d,use_port=%d%d",pid,(unsigned char)buf[9],(unsigned char)buf[16],(unsigned char)buf[17],(unsigned char)buf[18],(unsigned char)buf[19],(unsigned char)buf[22],(unsigned char)buf[23],(unsigned char)buf[20],(unsigned char)buf[21]);
+		print_file();
 	}else{
 		printf("no\n");
 		fprintf(stderr,"shell error\n");
