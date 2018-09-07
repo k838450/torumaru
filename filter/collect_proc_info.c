@@ -12,6 +12,7 @@
 char stat_path[128];
 char fd_path[128];
 char proc_log[128];
+char pid[64];
 
 int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
 	FILE * proc_fp;
@@ -79,7 +80,7 @@ int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
 }
 
 
-int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname){
+int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname,const char *tcp_inode){
 	DIR *fd_dir;
 	struct dirent *fd_dp;
 	char fd_num[128];
@@ -94,18 +95,12 @@ int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname){
 	regmatch_t fd_pmatch[fd_nmatch];
 
 	char inode[24];
-	int m;
+	int m,n;
 
-	char pid_inode[456];
+	pid[0]='\0';
 
-	char demo_tcp_inode[128];
-	demo_tcp_inode[0]='\0';
-	strcat(demo_tcp_inode,"30481");
-	
-	pid_inode[0]='\0';	
-
-	if((fd_dir=opendir(fd_path))==NULL){
-		fprintf(stderr,"fail to open /fd/num");
+	if((fd_dir=opendir(fd_path))==NULL){	
+		fprintf(stderr,"failed open /fd/num ");
 		exit(1);
 	}else{
 		for(fd_dp=readdir(fd_dir);fd_dp!=NULL;fd_dp=readdir(fd_dir)){
@@ -127,13 +122,11 @@ int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname){
 				m = fd_pmatch[2].rm_eo - fd_pmatch[2].rm_so;
 				snprintf(inode,m-1,&linkname[fd_pmatch[2].rm_so+1]);
 
-				if(strcmp(inode,demo_tcp_inode)==0){
-					//strcat(pid_inode,inode);
-					//strcat(pid_inode,",");
+				if(strcmp(inode,tcp_inode)==0){
+					strcat(pid,dname);
+					strcat(pid,",");
 					printf("path = %s -> %s\n",fd_num_path,linkname);
-					printf("inode = %s\n",inode);
-					printf("dname = %s\n",dname);
-					//printf("inode_list = %s\n",pid_inode);	
+					printf("pid = %s\n",pid);
 				}
 			
 			}else{
@@ -146,7 +139,7 @@ int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname){
 } 
 
 
-int make_path(){
+int make_path(const char *tcp_inode){
 	DIR *dir;
 	struct dirent *dp;
 	char dname[48];
@@ -190,8 +183,9 @@ int make_path(){
 				//proc_stat_info(stat_path,t,proc_print_fp);
 
 				//各PIDまでへのfdパスを作成してproc_fd_infoの実行
+				//printf("start %s\n",dname);
 				snprintf(fd_path,128,"%s%s%s","/proc/",dname,"/fd");
-				proc_fd_info(fd_path,t,proc_print_fp,dname);
+				proc_fd_info(fd_path,t,proc_print_fp,dname,tcp_inode);
 				
 			}
 			regfree(&p_preg);
@@ -202,10 +196,9 @@ int make_path(){
 	return 0;
 }
 
-
+/*
 int main(){
-
+	
 	make_path();
-
 	return 0;
-}
+}*/
