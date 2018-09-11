@@ -27,7 +27,7 @@ int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
 	regmatch_t pmatch[nmatch];
 	int i,j;
 
-	pid[0]='\0';
+	//pid[0]='\0';
 	comm[0]='\0';
 	
 	printf("start proc_info\n");
@@ -80,7 +80,7 @@ int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
 }
 
 
-int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname,const char *tcp_inode){
+int proc_fd_info(char *fd_path,long time,char *dname,const char *tcp_inode){
 	DIR *fd_dir;
 	struct dirent *fd_dp;
 	char fd_num[128];
@@ -97,11 +97,9 @@ int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname,const 
 	char inode[24];
 	int m,n;
 
-	pid[0]='\0';
-
-	if((fd_dir=opendir(fd_path))==NULL){	
-		fprintf(stderr,"failed open /fd/num ");
-		exit(1);
+	if((fd_dir=opendir(fd_path))==NULL){
+		//printf("no pid\n");
+		return 0;	
 	}else{
 		for(fd_dp=readdir(fd_dir);fd_dp!=NULL;fd_dp=readdir(fd_dir)){
 			strncpy(fd_num,fd_dp->d_name,126);
@@ -125,8 +123,8 @@ int proc_fd_info(char *fd_path,long time,FILE * proc_print_fp,char *dname,const 
 				if(strcmp(inode,tcp_inode)==0){
 					strcat(pid,dname);
 					strcat(pid,",");
-					printf("path = %s -> %s\n",fd_num_path,linkname);
-					printf("pid = %s\n",pid);
+					//printf("path = %s -> %s\n",fd_num_path,linkname);
+					//printf("pid = %s\n",pid);
 				}
 			
 			}else{
@@ -147,13 +145,15 @@ int make_path(const char *tcp_inode){
 	regex_t p_preg;
 	size_t p_nmatch=5;
 	regmatch_t p_pmatch[p_nmatch];
-
-	FILE * proc_print_fp;
+	
+	//FILE * proc_print_fp;
 	time_t t = time(NULL);
 	//char file_name[64];
+	
 	char file_path[128];
 
 	//ファイル名と出力先の設定
+	/*
 	//sprintf(file_name,"proc_%ld.csv",t);
 	sprintf(file_path,"/opt/filter/proc_%ld.csv",t);
 
@@ -161,7 +161,8 @@ int make_path(const char *tcp_inode){
 		fprintf(stderr,"fail to open proc_.csv");
 		exit(1);
 	}
-	
+	*/
+
 	if((dir=opendir("/proc"))==NULL){
 		fprintf(stderr,"can not open /proc");
 		exit(1);
@@ -185,13 +186,13 @@ int make_path(const char *tcp_inode){
 				//各PIDまでへのfdパスを作成してproc_fd_infoの実行
 				//printf("start %s\n",dname);
 				snprintf(fd_path,128,"%s%s%s","/proc/",dname,"/fd");
-				proc_fd_info(fd_path,t,proc_print_fp,dname,tcp_inode);
+				proc_fd_info(fd_path,t,dname,tcp_inode);
 				
 			}
 			regfree(&p_preg);
 		}
 		closedir(dir);
-		fclose(proc_print_fp);
+		//fclose(proc_print_fp);
 	}
 	return 0;
 }

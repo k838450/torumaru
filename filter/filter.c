@@ -15,7 +15,7 @@
 int fd_w;
 char port_num[48];
 char all_log[248];
-//extern char *pid; 
+extern char pid[64]; 
 
 int check_ip(const char *buf,int len){
 	char dist_ip[20];
@@ -86,7 +86,8 @@ int get_inode(const char *buf,int len){
 					snprintf(tcp_inode,j,"%s",&tcp_data[t_pmatch[9].rm_so]);	
 
 					//proc/[pid]/fdのinodeと比較を行う
-					printf("port_num = %s , packet_inode = %s\n",tcp_port,tcp_inode);
+					//printf("port_num = %s , packet_inode = %s\n",tcp_port,tcp_inode);
+					pid[0]='\0';
 					make_path(tcp_inode);		
 				}
 			}else{
@@ -99,14 +100,13 @@ int get_inode(const char *buf,int len){
 }
 
 
-//ペイロードからport番号を取り出してshellを起動
 static void print_payload(const char *buf,int len){
 	//port_num[0]='\0';
 	//char cmd[128];
 	char dist_port_hex[36];
 	long use_port;
 	long dist_port;	
-	char pid;
+	//char pid;
 
 	FILE * fp;
 
@@ -153,21 +153,21 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	//排除対象のIPかどうかを確認し，その後の処理をするかどうか判断	
 	//if (check_ip(payload,len)==0){
 		//優先順位をあげる	
-	/*	if (system(renice_cmd) != 0){
+		if (system(renice_cmd) != 0){
 			fprintf(stderr,"failed_renice_change\n");
 			exit(1);
 		}
-	*/
+	
 		//make_path();
 		get_inode(payload,len);	
 		print_payload(payload,len);
-	/*
+	
 		//優先順位を戻す
 		if (system(renice_cmd_return) != 0){
 			fprintf(stderr,"failed_renice_return\n");
 			exit(1);
 		}
-	*/		
+			
 	//}
 	
 	nfq_set_verdict(q_handle,id,NF_ACCEPT,0,NULL);
