@@ -17,34 +17,35 @@ char port_num[48];
 char all_log[248];
 extern char pid[64]; 
 
-int check_ip(const char *buf,int len){
-	char dist_ip[20];
-	char reject_ip[40];
-	//FILE * ip_file;
-	FILE * reject_file;
 
-	dist_ip[0]='\0';
-	//reject_ip[0]='\0';
-
-	//fprint payload's dist_ip	
-	sprintf(dist_ip,"%02x%02x%02x%02x\n",(unsigned char)buf[16],(unsigned char)buf[17],(unsigned char)buf[18],(unsigned char)buf[19]);
-
-	printf("start check_ip\n");
-
-	//pythonで登録したファイルを読み込んでipアドレスの比較を行う
-	reject_file=fopen("/opt/filter/rejectip.conf","r");
-		while (fgets(reject_ip,40,reject_file) != NULL){
-			if (strcmp(dist_ip,reject_ip)==0){
-				return 1;
-			}//else{
-				//return 0; 
-			//}	
-			reject_ip[0]='\0';
+int check_pid(){
+	FILE *cp_fp;
+	char readline[36]; 
+	char cmp_pid[36];
+	
+	cmp_pid[0]='\0';
+	snprintf(cmp_pid,34,"%s\n",pid);
+	
+	if((cp_fp=fopen("already_record_pid.txt","a+")) == NULL){
+		fprintf(stderr,"already_record_pid.txt file open error");
+		exit(1);
+	}	
+	while(fgets(readline,sizeof(readline),cp_fp) != NULL){
+		printf("pid_cmp=%s,line=%s",cmp_pid,readline);
+		if(strcmp(cmp_pid,readline)==0){
+			printf("this pid is already recoed\n");
+			return 1;
 		}
-	fclose(reject_file);
+
+	}
+
+	fprintf(cp_fp,"%s\n",pid);
+	
+	fclose(cp_fp);
 	return 0;
+
 }
- 
+
 
 int get_inode(const char *buf,int len){
 	//パケットの送り元ポート番号
@@ -86,9 +87,16 @@ int get_inode(const char *buf,int len){
 					snprintf(tcp_inode,j,"%s",&tcp_data[t_pmatch[9].rm_so]);	
 
 					//proc/[pid]/fdのinodeと比較を行う
-					//printf("port_num = %s , packet_inode = %s\n",tcp_port,tcp_inode);
-					pid[0]='\0';
-					make_path(tcp_inode);		
+					//pid(service)の組み合わせを入手
+					//pid[0]='\0';
+					make_path(tcp_inode);
+					printf("pid=%s;\n",pid);
+					//pid(service)の組み合わせを既存の物と比較	
+					
+/*
+					if(check_pid() == 1){
+						return 1;
+					}*/
 				}
 			}else{
 				//printf("/proc/net/tcp = %s",tcp_data);
@@ -97,25 +105,20 @@ int get_inode(const char *buf,int len){
 			tcp_data[0]='\0';
 		}
 	fclose(net_tcp);
+	return 0;
 }
 
 
 static void print_payload(const char *buf,int len){
-	//port_num[0]='\0';
-	//char cmd[128];
 	char dist_port_hex[36];
 	long use_port;
 	long dist_port;	
-	//char pid;
 
 	FILE * fp;
 
 	FILE * all_file;
 	time_t a_t = time(NULL);
 	
-	//sprintf(port_num,"%02x%02x",(unsigned char)buf[20],(unsigned char)buf[21]);
-	
-	//sprintf(cmd,"/opt/filter/port_conversion.sh %s",port_num);
 	use_port = strtol(port_num,NULL,16);
 	
 	sprintf(dist_port_hex,"%02x%02x",(unsigned char)buf[22],(unsigned char)buf[23]);
@@ -150,25 +153,26 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	sprintf(renice_cmd,"renice -20 -p %d > /dev/null 2>&1",c_pid);	
 	sprintf(renice_cmd_return,"renice 0 -p %d > /dev/null 2>&1",c_pid);
 	
-	//排除対象のIPかどうかを確認し，その後の処理をするかどうか判断	
-	//if (check_ip(payload,len)==0){
-		//優先順位をあげる	
-		if (system(renice_cmd) != 0){
-			fprintf(stderr,"failed_renice_change\n");
-			exit(1);
-		}
-	
-		//make_path();
-		get_inode(payload,len);	
+	//優先順位をあげる	
+	if (system(renice_cmd) != 0){
+		fprintf(stderr,"failed_renice_change\n");
+		exit(1);
+	}
+	/*
+	if(get_inode(payload,len) == 0){	
 		print_payload(payload,len);
+	}
+	*/
+	pid[0]='\0';
+	get_inode(payload,len);
+	print_payload(payload,len);
 	
-		//優先順位を戻す
-		if (system(renice_cmd_return) != 0){
-			fprintf(stderr,"failed_renice_return\n");
-			exit(1);
-		}
+	//優先順位を戻す
+	if (system(renice_cmd_return) != 0){
+		fprintf(stderr,"failed_renice_return\n");
+		exit(1);
+	}
 			
-	//}
 	
 	nfq_set_verdict(q_handle,id,NF_ACCEPT,0,NULL);
 
