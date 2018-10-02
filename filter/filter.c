@@ -11,11 +11,33 @@
 #include<libnetfilter_queue/libnetfilter_queue.h>
 
 #define QUEUE_NUM 2 
- 
+
 int fd_w;
 char port_num[48];
 char all_log[248];
 extern char pid[64]; 
+
+
+int check_protcol_num(const char *buf,int len){
+	char p_num[4];
+	int i_num = 0;
+
+	sprintf(p_num,"%2x",(unsigned char)buf[9]);
+	i_num = atoi(p_num);
+		
+	switch(i_num){
+		case 6://TCP
+			return 1;
+			break;
+		case 17://UDP
+			return 2;
+			break;
+		default:
+			break;
+	}
+	return 0;
+
+}
 
 
 int check_pid(){
@@ -43,14 +65,15 @@ int check_pid(){
 	
 	fclose(cp_fp);
 	return 0;
-
 }
 
 
-int get_inode(const char *buf,int len){
+int get_inode(const char *buf,int len,int rev){
 	//パケットの送り元ポート番号
 	port_num[0]='\0';	
 	sprintf(port_num,"%02x%02x",(unsigned char)buf[20],(unsigned char)buf[21]);
+
+	char path[32];
 	
 	char tcp_port[8];
 	char tcp_inode[32];
@@ -63,7 +86,17 @@ int get_inode(const char *buf,int len){
 	regmatch_t t_pmatch[t_nmatch];
 	int i,j;
 
-	if(regcomp(&t_preg,"([0-9]:)(.+:(.{4}))(.+:.{4})(.+:.+)([0-9]{2}:.{9})([0-9]{8})(.{16})([0-9]+)(.+)([a-z]{4}.+)",REG_EXTENDED|REG_NEWLINE) != 0 ){
+	path[0] = '\0';
+	if(rev == 1){
+		sprintf(path,"/proc/net/tcp");
+	}else if(rev == 2){
+		sprintf(path,"/proc/net/udp");
+	}else{
+		return 0;
+	}
+	
+
+	if(regcomp(&t_preg,"([0-9]+:)(.+:(.{4}))(.+:.{4})(.+:.+)([0-9]{2}:.{9})([0-9]{8})(.{16})([0-9]+)(.+)([a-z]{4}.+)",REG_EXTENDED|REG_NEWLINE) != 0 ){
 
 		fprintf(stderr,"net_tcp regex compile failed");
 		exit(1);
@@ -71,7 +104,7 @@ int get_inode(const char *buf,int len){
 	}
 
 	//proc/net/tcpを開いてinodeを収集する	
-	net_tcp=fopen("/proc/net/tcp","r");
+	net_tcp=fopen(path,"r");
 		while(fgets(tcp_data,247,net_tcp) != NULL){
 			//printf("String is %s\n",tcp_data);
 			if(regexec(&t_preg,tcp_data,t_nmatch,t_pmatch,0) == 0){
@@ -90,10 +123,10 @@ int get_inode(const char *buf,int len){
 					//pid(service)の組み合わせを入手
 					//pid[0]='\0';
 					make_path(tcp_inode);
-					printf("pid=%s;\n",pid);
-					//pid(service)の組み合わせを既存の物と比較	
 					
-/*
+
+					/*pid(service)の組み合わせを既存の物と比較	
+					
 					if(check_pid() == 1){
 						return 1;
 					}*/
@@ -164,7 +197,10 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	}
 	*/
 	pid[0]='\0';
-	get_inode(payload,len);
+
+	int rev = 0;
+	rev = check_protcol_num(payload,len);
+	get_inode(payload,len,rev);
 	print_payload(payload,len);
 	
 	//優先順位を戻す
