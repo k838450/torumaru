@@ -1,5 +1,3 @@
-//記録対象のパケットを検知した際に，その時端末内で動作していた全てのプロセスのpidと実行ファイル名を記録し，ファイルに出力する
-
 #include<stdio.h>
 #include<stdlib.h>
 #include<dirent.h>
@@ -14,29 +12,24 @@ char fd_path[128];
 char proc_log[128];
 char pid[64];
 
-int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
-	FILE * proc_fp;
-	//FILE * proc_print_fp;
-	
+int proc_stat_info(char *c_pid){
 	char proc_stat[248];
-	char pid[12];
 	char comm[24];
+	char stat_path[48];
+	
+	FILE * proc_fp;
 
 	regex_t preg;
 	size_t nmatch=5;
 	regmatch_t pmatch[nmatch];
-	int i,j;
+	int i;
 
 	//pid[0]='\0';
 	comm[0]='\0';
-	
-	printf("start proc_info\n");
-
+	sprintf(stat_path,"/proc/%s/stat",c_pid);
 	//proc/[PID]/statを開く
-	printf("stat_path = %s\n",proc_path);
-	if((proc_fp = fopen(proc_path,"rb")) != NULL){
+	if((proc_fp = fopen(stat_path,"r")) != NULL){
 		fgets(proc_stat,245,proc_fp);
-		//printf("%s\n",proc_stat);	
 		
 		//正規表現で()を引っこ抜こうとしている	
 		if(regcomp(&preg,"([0-9]+)(.+[^A-Z])([A-Z])(.+)",REG_EXTENDED|REG_NEWLINE) != 0){
@@ -45,37 +38,18 @@ int proc_stat_info(char *proc_path,long time,FILE * proc_print_fp){
 		}
 		
 		if(regexec(&preg,proc_stat,nmatch,pmatch,0) == 0){
-			//PIDの取得
-			j = pmatch[1].rm_eo - pmatch[1].rm_so;
-			j = j+1;
-			snprintf(pid,j,"%s",&proc_stat[pmatch[1].rm_so]);
-			
 			//()を抜いて変数に入れる処理
 			i = pmatch[2].rm_eo - pmatch[2].rm_so;
 			i = i-1;
 			snprintf(comm,i,"%s",&proc_stat[pmatch[2].rm_so]+1);
-
-			printf("pid = %s\n",pid);
-			printf("cmm = %s\n",comm);
-			printf("%s\n",proc_stat);	
-
-/*	
-			if((proc_print_fp = fopen(file_path,"a")) == NULL){
-				printf("%d\n",&proc_print_fp);
-				fprintf(stderr,"fail to open proc_.csv");
-				exit(1);
-			}
-*/
-			printf("[time=%ld,pid=%s,comm=%s]\n",time,pid,comm);	
-			fprintf(proc_print_fp,"[time=%ld,pid=%s,comm=%s]\n",time,pid,comm);	
+			
+			strcat(pid,comm);
 		}else{
 			printf("no match ()\n");
 		}
 		regfree(&preg);
-		//printf("i=%d,eo=%d,so=%d\n",i,pmatch[2].rm_eo,pmatch[2].rm_so);
-		//printf("%s\n",comm);
+		fclose(proc_fp);
 	}
-	printf("you\n");
 	return 0;
 }
 
@@ -95,6 +69,7 @@ int proc_fd_info(char *fd_path,long time,char *dname,const char *tcp_inode){
 	regmatch_t fd_pmatch[fd_nmatch];
 
 	char inode[24];
+	char c_pid[24];
 	int m,n;
 
 	if((fd_dir=opendir(fd_path))==NULL){
@@ -121,10 +96,10 @@ int proc_fd_info(char *fd_path,long time,char *dname,const char *tcp_inode){
 				snprintf(inode,m-1,&linkname[fd_pmatch[2].rm_so+1]);
 
 				if(strcmp(inode,tcp_inode)==0){
+					sprintf(c_pid,"%s",dname);
 					strcat(pid,dname);
+					proc_stat_info(c_pid);			
 					strcat(pid,",");
-					//printf("path = %s -> %s\n",fd_num_path,linkname);
-					//printf("pid = %s\n",pid);
 				}
 			
 			}else{
@@ -152,17 +127,6 @@ int make_path(const char *tcp_inode){
 	
 	char file_path[128];
 
-	//ファイル名と出力先の設定
-	/*
-	//sprintf(file_name,"proc_%ld.csv",t);
-	sprintf(file_path,"/opt/filter/proc_%ld.csv",t);
-
-	if((proc_print_fp = fopen(file_path,"a")) == NULL){
-		fprintf(stderr,"fail to open proc_.csv");
-		exit(1);
-	}
-	*/
-
 	if((dir=opendir("/proc"))==NULL){
 		fprintf(stderr,"can not open /proc");
 		exit(1);
@@ -179,10 +143,6 @@ int make_path(const char *tcp_inode){
 			if(regexec(&p_preg,dname,p_nmatch,p_pmatch,0) != 0){
 				//printf("stat_path =  %s [no number]\n",dname);
 			}else{
-				//statのファイルパスを作成してproc_infoの実行
-				//snprintf(stat_path,128,"%s%s%s","/proc/",dname,"/stat");
-				//proc_stat_info(stat_path,t,proc_print_fp);
-
 				//各PIDまでへのfdパスを作成してproc_fd_infoの実行
 				//printf("start %s\n",dname);
 				snprintf(fd_path,128,"%s%s%s","/proc/",dname,"/fd");
