@@ -98,6 +98,7 @@ int proc_fd_info(char *fd_path,long time,char *dname,const char *tcp_inode){
 				if(strcmp(inode,tcp_inode)==0){
 					sprintf(c_pid,"%s",dname);
 					strcat(pid,dname);
+					
 					proc_stat_info(c_pid);			
 					strcat(pid,",");
 				}
@@ -105,6 +106,7 @@ int proc_fd_info(char *fd_path,long time,char *dname,const char *tcp_inode){
 			}else{
 				//printf("no mutch\n");
 			}
+			regfree(&fd_preg);
 		}
 		closedir(fd_dir);	
 	}

@@ -68,6 +68,33 @@ int check_pid(){
 }
 
 
+//除外対象は1を返して，記録対象なら0を返す
+int check_ip(const char *buf,int len){
+	char dist_ip[20];
+	char reject_ip[40];
+	FILE * reject_file;
+
+	dist_ip[0]='\0';
+
+	sprintf(dist_ip,"%02x%02x%02x%02x\n",(unsigned char)buf[16],(unsigned char)buf[17],(unsigned char)buf[18],(unsigned char)buf[19]);
+
+	reject_ip[0]='\0';
+
+	reject_file=fopen("/opt/filter/rejectip.conf","r");
+		while(fgets(reject_ip,40,reject_file) != NULL){
+			if(strcmp(dist_ip,reject_ip)==0){
+				printf("pass ip\n");
+				fclose(reject_file);
+				return 1;
+			}
+		}
+
+	printf("no pass ip\n");
+	fclose(reject_file);
+	return 0;
+}
+
+
 int get_inode(const char *buf,int len,int rev){
 	//パケットの送り元ポート番号
 	port_num[0]='\0';	
@@ -122,9 +149,9 @@ int get_inode(const char *buf,int len,int rev){
 					//proc/[pid]/fdのinodeと比較を行う
 					//pid(service)の組み合わせを入手
 					//pid[0]='\0';
+					
 					make_path(tcp_inode);
 					
-
 					/*pid(service)の組み合わせを既存の物と比較	
 					
 					if(check_pid() == 1){
@@ -177,20 +204,22 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 
 	len = nfq_get_payload(nfdata,(u_char **)&payload);
 
-	char renice_cmd[48];
-	char renice_cmd_return[48];
+	//char renice_cmd[48];
+	//char renice_cmd_return[48];
 	
-	pid_t c_pid;
-	c_pid = getpid();
+	//korehanani?
+	//pid_t c_pid;
+	//c_pid = getpid();
 
-	sprintf(renice_cmd,"renice -20 -p %d > /dev/null 2>&1",c_pid);	
-	sprintf(renice_cmd_return,"renice 0 -p %d > /dev/null 2>&1",c_pid);
+	//sprintf(renice_cmd,"renice -20 -p %d > /dev/null 2>&1",c_pid);	
+	//sprintf(renice_cmd_return,"renice 0 -p %d > /dev/null 2>&1",c_pid);
 	
 	//優先順位をあげる	
-	if (system(renice_cmd) != 0){
+	/*if (system(renice_cmd) != 0){
 		fprintf(stderr,"failed_renice_change\n");
 		exit(1);
-	}
+	}*/
+	
 	/*
 	if(get_inode(payload,len) == 0){	
 		print_payload(payload,len);
@@ -199,18 +228,24 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	pid[0]='\0';
 
 	int rev = 0;
-	rev = check_protcol_num(payload,len);
-	get_inode(payload,len,rev);
-	print_payload(payload,len);
+
 	
+	if(check_ip(payload,len) == 0){
+		rev = check_protcol_num(payload,len);
+		get_inode(payload,len,rev);
+		print_payload(payload,len);
+	}
+
+
 	//優先順位を戻す
+	/*
 	if (system(renice_cmd_return) != 0){
 		fprintf(stderr,"failed_renice_return\n");
 		exit(1);
-	}
+	}*/
 			
 	
-	nfq_set_verdict(q_handle,id,NF_ACCEPT,0,NULL);
+	return nfq_set_verdict(q_handle,id,NF_ACCEPT,0,NULL);
 
 }
 
@@ -253,11 +288,15 @@ int main(void){
 
 	fd = nfq_fd(handle);
 
+	printf("before while\n");
+
 	while((len = read(fd,buf,sizeof(buf))) >= 0){
 		nfq_handle_packet(handle,buf,len);
-		//memset(buf, '\0',4096);
-		buf[0]='\0';
+		memset(buf, '\0',4096);
+		//buf[0]='\0';
 	}
+
+	printf("after while\n");
 
 	nfq_destroy_queue(q_handle);
 	nfq_unbind_pf(handle, AF_INET);
