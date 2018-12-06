@@ -9,6 +9,7 @@
 #include<time.h>
 #include<linux/netfilter.h>
 #include<libnetfilter_queue/libnetfilter_queue.h>
+#include<syslog.h>
 
 #define QUEUE_NUM 2 
 
@@ -83,13 +84,13 @@ int check_ip(const char *buf,int len){
 	reject_file=fopen("/opt/filter/rejectip.conf","r");
 		while(fgets(reject_ip,40,reject_file) != NULL){
 			if(strcmp(dist_ip,reject_ip)==0){
-				printf("pass ip\n");
+				//printf("pass ip\n");
 				fclose(reject_file);
 				return 1;
 			}
 		}
 
-	printf("no pass ip\n");
+	//printf("no pass ip\n");
 	fclose(reject_file);
 	return 0;
 }
@@ -191,6 +192,10 @@ static void print_payload(const char *buf,int len){
 		fprintf(stderr,"can not open net_filter_log.csv");
 	}	
 
+	openlog("filter_syslog",LOG_PID,LOG_LOCAL3);
+	syslog(LOG_INFO,all_log);
+	closelog();
+
 	fprintf(all_file,"%s\n",all_log);
 	fclose(all_file);
 }
@@ -218,9 +223,8 @@ int get_payload(struct nfq_q_handle *q_handle, struct nfgenmsg *nfmsg, struct nf
 	/*if (system(renice_cmd) != 0){
 		fprintf(stderr,"failed_renice_change\n");
 		exit(1);
-	}*/
-	
-	/*
+	}
+	/
 	if(get_inode(payload,len) == 0){	
 		print_payload(payload,len);
 	}
@@ -288,15 +292,11 @@ int main(void){
 
 	fd = nfq_fd(handle);
 
-	printf("before while\n");
-
 	while((len = read(fd,buf,sizeof(buf))) >= 0){
 		nfq_handle_packet(handle,buf,len);
 		memset(buf, '\0',4096);
 		//buf[0]='\0';
 	}
-
-	printf("after while\n");
 
 	nfq_destroy_queue(q_handle);
 	nfq_unbind_pf(handle, AF_INET);
