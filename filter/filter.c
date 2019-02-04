@@ -185,7 +185,7 @@ static void print_payload(const char *buf,int len){
 	sprintf(dist_port_hex,"%02x%02x",(unsigned char)buf[22],(unsigned char)buf[23]);
 	dist_port = strtol(port_num,NULL,16);	
 
-	sprintf(all_log,"time=%ld,protcol_num=%02x,dist_ip=%d.%d.%d.%d,dist_port=%ld,use_port=%ld,pid=%s",a_t,(unsigned char)buf[9],(unsigned char)buf[16],(unsigned char)buf[17],(unsigned char)buf[18],(unsigned char)buf[19],dist_port,use_port,pid);
+	sprintf(all_log,"time=%ld,protcol_num=%02x,dest_ip=%d.%d.%d.%d,dest_port=%ld,use_port=%ld,pid=%s",a_t,(unsigned char)buf[9],(unsigned char)buf[16],(unsigned char)buf[17],(unsigned char)buf[18],(unsigned char)buf[19],dist_port,use_port,pid);
 	//ログの吐き出し
 		
 	if((all_file = fopen("/opt/filter/net_filter_log.csv","a"))==NULL){
